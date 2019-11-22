@@ -16,7 +16,19 @@
             android:layout_width="match_parent"
             android:layout_height="?attr/actionBarSize"
             android:background="?attr/colorPrimary"
-            app:popupTheme="@style/AppTheme.PopupOverlay" />
+            app:popupTheme="@style/AppTheme.PopupOverlay">
+        <EditText
+            android:id="@+id/search_bar"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="?attr/colorPrimary"
+            android:maxLines="1"
+            android:inputType="text"
+            android:hint="Search city"
+            android:drawableLeft="@drawable/search"
+            />
+    </androidx.appcompat.widget.Toolbar>
+    />
 
     </com.google.android.material.appbar.AppBarLayout>
 
