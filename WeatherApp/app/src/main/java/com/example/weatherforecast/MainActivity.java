@@ -1,19 +1,24 @@
 package com.example.weatherforecast;
 
+import android.content.Context;
 import android.location.Location;
 import android.location.LocationManager;
 import android.os.Bundle;
 
+
+import com.android.volley.Request;
+import com.android.volley.RequestQueue;
+import com.android.volley.VolleyError;
+import com.android.volley.toolbox.StringRequest;
+import com.android.volley.toolbox.Volley;
+import com.android.volley.Response;
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.tasks.OnSuccessListener;
-import com.google.android.material.floatingactionbutton.FloatingActionButton;
-import com.google.android.material.snackbar.Snackbar;
 
 import android.view.KeyEvent;
 import android.view.MenuItem;
 import android.view.SubMenu;
-import android.view.View;
 
 import androidx.navigation.NavController;
 import androidx.navigation.Navigation;
@@ -28,12 +33,12 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
 
 import android.view.Menu;
+import android.view.View;
 import android.view.inputmethod.EditorInfo;
 import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import org.w3c.dom.Text;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -42,6 +47,8 @@ public class MainActivity extends AppCompatActivity {
     private SubMenu FavouriteCitiesMenu;
     private FusedLocationProviderClient fusedLocationClient;
     private EditText search_bar;
+    public String actualWeatherJSON = "", forecastJSON = "";
+    public double longitude, latitude;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -52,8 +59,7 @@ public class MainActivity extends AppCompatActivity {
         DrawerLayout drawer = findViewById(R.id.drawer_layout);
         navigationView = findViewById(R.id.nav_view);
         FavouriteCitiesMenu =  navigationView.getMenu().addSubMenu("Favourite cities");
-        // Passing each menu ID as a set of Ids because each
-        // menu should be considered as top level destinations.
+
         mAppBarConfiguration = new AppBarConfiguration.Builder(
                 R.id.nav_home)
                 .setDrawerLayout(drawer)
@@ -61,6 +67,8 @@ public class MainActivity extends AppCompatActivity {
         NavController navController = Navigation.findNavController(this, R.id.nav_host_fragment);
         NavigationUI.setupActionBarWithNavController(this, navController, mAppBarConfiguration);
         NavigationUI.setupWithNavController(navigationView, navController);
+
+        //Search bar init
         search_bar = findViewById(R.id.search_bar);
         search_bar.setOnEditorActionListener(
                 new EditText.OnEditorActionListener() {
@@ -72,7 +80,7 @@ public class MainActivity extends AppCompatActivity {
                                         event.getAction() == KeyEvent.ACTION_DOWN &&
                                         event.getKeyCode() == KeyEvent.KEYCODE_ENTER) {
                             if (event == null || !event.isShiftPressed()) {
-                                showForecastForCity(search_bar.getText().toString());
+                                httpRequestForCity(search_bar.getText().toString());
                                 search_bar.setText("");
                                 search_bar.clearFocus();
                             }
@@ -81,13 +89,31 @@ public class MainActivity extends AppCompatActivity {
                     }
                 }
         );
-        fusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
 
-        showForecastForLocation();
+        // Location manager
+        fusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
+        fusedLocationClient.getLastLocation()
+                .addOnSuccessListener(this, new OnSuccessListener<Location>() {
+                    @Override
+                    public void onSuccess(Location location) {
+                        if (location != null) {
+                                longitude = location.getLongitude();
+                                latitude = location.getLatitude();
+                        }
+                        else {
+                            Toast.makeText(MainActivity.this, "Could not get location", Toast.LENGTH_SHORT).show();
+                        }
+                    }
+                });
 
         addFavouriteCity("Ostrava");
         addFavouriteCity("Praha");
+    }
 
+    @Override
+    protected void onStart() {
+        super.onStart();
+        httpRequestForLocation();
     }
 
     @Override
@@ -109,38 +135,99 @@ public class MainActivity extends AppCompatActivity {
         FavouriteCitiesMenu.add(cityName).setOnMenuItemClickListener(new MenuItem.OnMenuItemClickListener() {
             @Override
             public boolean onMenuItemClick(MenuItem item) {
-                showForecastForCity(cityName);
+                httpRequestForCity(cityName);
                 return false;
             }
         });
         navigationView.invalidate();
     }
 
-    public void showForecastForCity(String cityName)
+    public void httpRequestForCity(String cityName)
     {
-        TextView txtView = (TextView)findViewById(R.id.text_home);
-        txtView.setText("Forecast for " + cityName);
+        final TextView txtView = findViewById(R.id.text_home);
 
-        //TODO implement display real forecast
+        RequestQueue queue = Volley.newRequestQueue(this);
+
+        //Actual weather request
+        String url ="http://api.openweathermap.org/data/2.5/weather?q=" + cityName +"&APPID=4aa7f805e66520625f6b4017c52f4c83&units=metric";
+        StringRequest stringRequestActual = new StringRequest(Request.Method.GET, url,
+                new Response.Listener<String>() {
+                    @Override
+                    public void onResponse(String response) {
+                        actualWeatherJSON = response;
+                    }
+                }, new Response.ErrorListener() {
+            @Override
+            public void onErrorResponse(VolleyError error) {
+
+            }
+        });
+
+        //Forecast request
+        url = "http://api.openweathermap.org/data/2.5/forecast?q=" + cityName +"&APPID=4aa7f805e66520625f6b4017c52f4c83&units=metric";
+        StringRequest stringRequestForecast = new StringRequest(Request.Method.GET, url,
+                new Response.Listener<String>() {
+                    @Override
+                    public void onResponse(String response) {
+                        forecastJSON = response;
+                        txtView.setText(actualWeatherJSON + '\n' + forecastJSON);
+                        //TODO process JSON and show forecast on screen
+                    }
+                }, new Response.ErrorListener() {
+            @Override
+            public void onErrorResponse(VolleyError error) {
+
+            }
+        });
+
+        //Adding requests to que
+        queue.add(stringRequestActual);
+        queue.add(stringRequestForecast);
     }
 
-    public void showForecastForLocation()
-    {
-        fusedLocationClient.getLastLocation()
-                .addOnSuccessListener(this, new OnSuccessListener<Location>() {
+    public void httpRequestForLocation() {
+
+        final TextView txtView = findViewById(R.id.text_home);
+        //Getting location
+        if(latitude == 0 && longitude == 0)
+        {
+            fusedLocationClient.getLastLocation();
+        }
+
+        RequestQueue queue = Volley.newRequestQueue(this);
+
+        //Actual weather request
+        String url ="http://api.openweathermap.org/data/2.5/weather?lat=" + latitude + "&lon=" + longitude +"&APPID=4aa7f805e66520625f6b4017c52f4c83&units=metric";
+        StringRequest stringRequestActual = new StringRequest(Request.Method.GET, url,
+                new Response.Listener<String>() {
                     @Override
-                    public void onSuccess(Location location) {
-                        // Got last known location. In some rare situations this can be null.
-                        if (location != null) {
-                            double longitude = location.getLongitude();
-                            double latitude = location.getLatitude();
-
-                            TextView txtView = (TextView) findViewById(R.id.text_home);
-                            txtView.setText("Longitude:  " + longitude + " Latitude: " + latitude);
-
-                            //TODO implement display real forecast
-                        }
+                    public void onResponse(String response) {
+                        actualWeatherJSON = response;
                     }
-                });
+                }, new Response.ErrorListener() {
+            @Override
+            public void onErrorResponse(VolleyError error) {
+
+            }
+        });
+
+        url = "http://api.openweathermap.org/data/2.5/forecast?lat=" + latitude + "&lon=" + longitude +"&APPID=4aa7f805e66520625f6b4017c52f4c83&units=metric";
+        StringRequest stringRequestForecast = new StringRequest(Request.Method.GET, url,
+                new Response.Listener<String>() {
+                    @Override
+                    public void onResponse(String response) {
+                        forecastJSON = response;
+                        txtView.setText(actualWeatherJSON + '\n' + forecastJSON);
+                        //TODO process JSON and show forecast on screen
+                    }
+                }, new Response.ErrorListener() {
+            @Override
+            public void onErrorResponse(VolleyError error) {
+
+            }
+        });
+
+        queue.add(stringRequestActual);
+        queue.add(stringRequestForecast);
     }
 }
