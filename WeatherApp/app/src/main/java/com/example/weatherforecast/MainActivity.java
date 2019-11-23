@@ -48,7 +48,7 @@ public class MainActivity extends AppCompatActivity {
     private FusedLocationProviderClient fusedLocationClient;
     private EditText search_bar;
     public String actualWeatherJSON = "", forecastJSON = "";
-    public double longitude, latitude;
+    public double longitude = -1, latitude = -1;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -92,13 +92,15 @@ public class MainActivity extends AppCompatActivity {
 
         // Location manager
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
+
         fusedLocationClient.getLastLocation()
                 .addOnSuccessListener(this, new OnSuccessListener<Location>() {
                     @Override
                     public void onSuccess(Location location) {
                         if (location != null) {
-                                longitude = location.getLongitude();
-                                latitude = location.getLatitude();
+                            longitude = location.getLongitude();
+                            latitude = location.getLatitude();
+                            httpRequestForLocation();
                         }
                         else {
                             Toast.makeText(MainActivity.this, "Could not get location", Toast.LENGTH_SHORT).show();
@@ -113,7 +115,9 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onStart() {
         super.onStart();
-        httpRequestForLocation();
+
+        //Get location on start which call httprequest for location
+        fusedLocationClient.getLastLocation();
     }
 
     @Override
@@ -159,6 +163,7 @@ public class MainActivity extends AppCompatActivity {
                 }, new Response.ErrorListener() {
             @Override
             public void onErrorResponse(VolleyError error) {
+                Toast.makeText(MainActivity.this, "City not found", Toast.LENGTH_SHORT).show();
 
             }
         });
@@ -188,11 +193,6 @@ public class MainActivity extends AppCompatActivity {
     public void httpRequestForLocation() {
 
         final TextView txtView = findViewById(R.id.text_home);
-        //Getting location
-        if(latitude == 0 && longitude == 0)
-        {
-            fusedLocationClient.getLastLocation();
-        }
 
         RequestQueue queue = Volley.newRequestQueue(this);
 
