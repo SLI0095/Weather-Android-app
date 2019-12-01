@@ -39,6 +39,13 @@ import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+
+import java.util.ArrayList;
+import java.util.List;
+
 
 public class MainActivity extends AppCompatActivity {
 
@@ -47,12 +54,14 @@ public class MainActivity extends AppCompatActivity {
     private SubMenu FavouriteCitiesMenu;
     private FusedLocationProviderClient fusedLocationClient;
     private EditText search_bar;
+    private ArrayList<Weather> weatherList;
     public String actualWeatherJSON = "", forecastJSON = "";
     public double longitude = -1, latitude = -1;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        weatherList = new ArrayList<Weather>();
         setContentView(R.layout.activity_main);
         Toolbar toolbar = findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
@@ -159,6 +168,7 @@ public class MainActivity extends AppCompatActivity {
                     @Override
                     public void onResponse(String response) {
                         actualWeatherJSON = response;
+                        helo();
                     }
                 }, new Response.ErrorListener() {
             @Override
@@ -175,7 +185,7 @@ public class MainActivity extends AppCompatActivity {
                     @Override
                     public void onResponse(String response) {
                         forecastJSON = response;
-                        txtView.setText(actualWeatherJSON + '\n' + forecastJSON);
+                        //txtView.setText(actualWeatherJSON + '\n' + forecastJSON);
                         //TODO process JSON and show forecast on screen
                     }
                 }, new Response.ErrorListener() {
@@ -203,6 +213,7 @@ public class MainActivity extends AppCompatActivity {
                     @Override
                     public void onResponse(String response) {
                         actualWeatherJSON = response;
+                        helo();
                     }
                 }, new Response.ErrorListener() {
             @Override
@@ -217,7 +228,7 @@ public class MainActivity extends AppCompatActivity {
                     @Override
                     public void onResponse(String response) {
                         forecastJSON = response;
-                        txtView.setText(actualWeatherJSON + '\n' + forecastJSON);
+                        //txtView.setText(actualWeatherJSON + '\n' + forecastJSON);
                         //TODO process JSON and show forecast on screen
                     }
                 }, new Response.ErrorListener() {
@@ -229,5 +240,32 @@ public class MainActivity extends AppCompatActivity {
 
         queue.add(stringRequestActual);
         queue.add(stringRequestForecast);
+    }
+
+    public void helo()
+    {
+        final TextView txtView = findViewById(R.id.text_home);
+        try {
+            weatherList = new ArrayList<Weather>();
+            JSONObject root = new JSONObject(actualWeatherJSON);
+            String cityname = root.getString("name");
+            JSONArray weather = root.getJSONArray("weather");
+            JSONObject weatherobj = weather.getJSONObject(0);
+            String main = weatherobj.getString("main");
+            String description = weatherobj.getString("description");
+            String icon = weatherobj.getString("icon");
+            JSONObject weatherMain = root.getJSONObject("main");
+            double temp = weatherMain.getDouble("temp");
+            int pressure = weatherMain.getInt("pressure");
+            int humidity = weatherMain.getInt("humidity");
+
+            weatherList.add(new Weather(cityname,main,description,icon,temp,pressure,humidity));
+
+
+            txtView.setText(cityname + '\n' + main + '\n' + description + '\n' + icon + '\n' + temp + '\n' + pressure);
+
+        } catch (JSONException e) {
+            e.printStackTrace();
+        }
     }
 }
