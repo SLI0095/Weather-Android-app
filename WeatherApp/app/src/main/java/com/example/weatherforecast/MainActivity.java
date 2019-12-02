@@ -3,6 +3,7 @@ package com.example.weatherforecast;
 import android.content.Context;
 import android.location.Location;
 import android.location.LocationManager;
+import android.os.Build;
 import android.os.Bundle;
 
 
@@ -36,6 +37,7 @@ import android.view.Menu;
 import android.view.View;
 import android.view.inputmethod.EditorInfo;
 import android.widget.EditText;
+import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -43,7 +45,10 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Date;
 import java.util.List;
 
 
@@ -55,6 +60,8 @@ public class MainActivity extends AppCompatActivity {
     private FusedLocationProviderClient fusedLocationClient;
     private EditText search_bar;
     private ArrayList<Weather> weatherList;
+    private ListView listView;
+    private WeatherAdapter Adapter;
     public String actualWeatherJSON = "", forecastJSON = "";
     public double longitude = -1, latitude = -1;
 
@@ -119,11 +126,13 @@ public class MainActivity extends AppCompatActivity {
 
         addFavouriteCity("Ostrava");
         addFavouriteCity("Praha");
+        listView = (ListView)findViewById(R.id.weather_list);
     }
 
     @Override
     protected void onStart() {
         super.onStart();
+        listView = (ListView)findViewById(R.id.weather_list);
 
         //Get location on start which call httprequest for location
         fusedLocationClient.getLastLocation();
@@ -157,7 +166,7 @@ public class MainActivity extends AppCompatActivity {
 
     public void httpRequestForCity(String cityName)
     {
-        final TextView txtView = findViewById(R.id.text_home);
+        //final TextView txtView = findViewById(R.id.text_home);
 
         RequestQueue queue = Volley.newRequestQueue(this);
 
@@ -168,7 +177,6 @@ public class MainActivity extends AppCompatActivity {
                     @Override
                     public void onResponse(String response) {
                         actualWeatherJSON = response;
-                        helo();
                     }
                 }, new Response.ErrorListener() {
             @Override
@@ -185,6 +193,7 @@ public class MainActivity extends AppCompatActivity {
                     @Override
                     public void onResponse(String response) {
                         forecastJSON = response;
+                        DecodeJson();
                         //txtView.setText(actualWeatherJSON + '\n' + forecastJSON);
                         //TODO process JSON and show forecast on screen
                     }
@@ -202,7 +211,7 @@ public class MainActivity extends AppCompatActivity {
 
     public void httpRequestForLocation() {
 
-        final TextView txtView = findViewById(R.id.text_home);
+        //final TextView txtView = findViewById(R.id.text_home);
 
         RequestQueue queue = Volley.newRequestQueue(this);
 
@@ -213,7 +222,6 @@ public class MainActivity extends AppCompatActivity {
                     @Override
                     public void onResponse(String response) {
                         actualWeatherJSON = response;
-                        helo();
                     }
                 }, new Response.ErrorListener() {
             @Override
@@ -228,6 +236,7 @@ public class MainActivity extends AppCompatActivity {
                     @Override
                     public void onResponse(String response) {
                         forecastJSON = response;
+                        DecodeJson();
                         //txtView.setText(actualWeatherJSON + '\n' + forecastJSON);
                         //TODO process JSON and show forecast on screen
                     }
@@ -242,10 +251,11 @@ public class MainActivity extends AppCompatActivity {
         queue.add(stringRequestForecast);
     }
 
-    public void helo()
+    public void DecodeJson()
     {
-        final TextView txtView = findViewById(R.id.text_home);
+        //final TextView txtView = findViewById(R.id.text_home);
         try {
+            listView = (ListView)findViewById(R.id.weather_list);
             weatherList = new ArrayList<Weather>();
             JSONObject root = new JSONObject(actualWeatherJSON);
             String cityname = root.getString("name");
@@ -259,10 +269,45 @@ public class MainActivity extends AppCompatActivity {
             int pressure = weatherMain.getInt("pressure");
             int humidity = weatherMain.getInt("humidity");
 
-            weatherList.add(new Weather(cityname,main,description,icon,temp,pressure,humidity));
+            Date c = Calendar.getInstance().getTime();
+            SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd");
+            String date = df.format(c);
+
+            weatherList.add(new Weather(cityname,main,description,icon,temp,pressure,humidity,date));
+
+            root = new JSONObject(forecastJSON);
+            JSONArray forecasts = root.getJSONArray("list");
+            for(int i = 0; i < forecasts.length(); i++)
+            {
+                weatherobj = forecasts.getJSONObject(i);
+                String checkdate = weatherobj.getString("dt_txt");
+                if(checkdate.contains("12:00") && !checkdate.contains(date))
+                {
+                    date = checkdate.substring(0,10);
+                    weatherMain = weatherobj.getJSONObject("main");
+                    temp = weatherMain.getDouble("temp");
+                    pressure = weatherMain.getInt("pressure");
+                    humidity = weatherMain.getInt("humidity");
+                    weather = weatherobj.getJSONArray("weather");
+                    JSONObject weatherDesc = weather.getJSONObject(0);
+                    main = weatherDesc.getString("main");
+                    description = weatherDesc.getString("description");
+                    icon = weatherDesc.getString("icon");
+
+                    weatherList.add(new Weather(cityname,main,description,icon,temp,pressure,humidity,date));
+                }
+            }
+            weatherList.remove(weatherList.size()-1);
+            Adapter = new WeatherAdapter(this,weatherList);
+            listView.setAdapter(Adapter);
+
+            search_bar.setText(cityname);
+            //txtView.setText(cityname);
+
+            //TODO save weatherList into file
 
 
-            txtView.setText(cityname + '\n' + main + '\n' + description + '\n' + icon + '\n' + temp + '\n' + pressure);
+            //txtView.setText(cityname + '\n' + main + '\n' + description + '\n' + icon + '\n' + temp + '\n' + pressure + '\n' + humidity + '\n' + date);
 
         } catch (JSONException e) {
             e.printStackTrace();
