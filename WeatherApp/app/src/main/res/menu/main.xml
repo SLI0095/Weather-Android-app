@@ -2,8 +2,15 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
     <item
-        android:id="@+id/action_settings"
+        android:id="@+id/addCity"
         android:orderInCategory="100"
-        android:title="@string/action_settings"
-        app:showAsAction="never" />
+        android:title="Add to favourite"
+        app:showAsAction="never"/>
+    <item
+        android:id="@+id/removeCity"
+        android:orderInCategory="100"
+        android:title="Remove from favourite"
+        app:showAsAction="never"
+        />
+
 </menu>

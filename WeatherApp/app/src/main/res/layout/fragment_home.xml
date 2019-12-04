@@ -5,10 +5,18 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-    <ListView
-        android:id="@+id/weather_list"
-        android:layout_width="413dp"
-        android:layout_height="734dp"
-        tools:layout_editor_absoluteX="-2dp"
-        tools:layout_editor_absoluteY="-2dp" />
+    <com.baoyz.widget.PullRefreshLayout
+        android:id="@+id/swipeRefreshLayout"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <ListView
+            android:id="@+id/weather_list"
+            android:layout_width="413dp"
+            android:layout_height="734dp"
+            tools:layout_editor_absoluteX="-2dp"
+            tools:layout_editor_absoluteY="-2dp" />
+
+    </com.baoyz.widget.PullRefreshLayout>
+
 </androidx.constraintlayout.widget.ConstraintLayout>

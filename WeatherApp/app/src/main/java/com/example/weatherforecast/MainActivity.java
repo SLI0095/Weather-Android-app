@@ -1,6 +1,10 @@
 package com.example.weatherforecast;
 
+import android.content.ContentValues;
 import android.content.Context;
+import android.content.IntentSender;
+import android.content.SharedPreferences;
+import android.database.Cursor;
 import android.location.Location;
 import android.location.LocationManager;
 import android.os.Build;
@@ -13,19 +17,28 @@ import com.android.volley.VolleyError;
 import com.android.volley.toolbox.StringRequest;
 import com.android.volley.toolbox.Volley;
 import com.android.volley.Response;
+import com.baoyz.widget.PullRefreshLayout;
+import com.google.android.gms.common.api.ResolvableApiException;
 import com.google.android.gms.location.FusedLocationProviderClient;
+import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.location.LocationServices;
+import com.google.android.gms.location.LocationSettingsRequest;
+import com.google.android.gms.location.LocationSettingsResponse;
+import com.google.android.gms.location.SettingsClient;
+import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.OnSuccessListener;
 
 import android.view.KeyEvent;
 import android.view.MenuItem;
 import android.view.SubMenu;
 
+import androidx.annotation.NonNull;
 import androidx.navigation.NavController;
 import androidx.navigation.Navigation;
 import androidx.navigation.ui.AppBarConfiguration;
 import androidx.navigation.ui.NavigationUI;
 
+import com.google.android.gms.tasks.Task;
 import com.google.android.material.navigation.NavigationView;
 
 import androidx.drawerlayout.widget.DrawerLayout;
@@ -62,13 +75,32 @@ public class MainActivity extends AppCompatActivity {
     private ArrayList<Weather> weatherList;
     private ListView listView;
     private WeatherAdapter Adapter;
+    private Menu menu;
+    private String actualcity;
     public String actualWeatherJSON = "", forecastJSON = "";
     public double longitude = -1, latitude = -1;
+    private DatabaseHelper databaseHelper;
+    private PullRefreshLayout pullHook;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        //Shared preferences loading saved JSONs
+        SharedPreferences sharedPref = getApplicationContext().getSharedPreferences("JSONs", Context.MODE_PRIVATE);
+        if(sharedPref.contains("weather"))
+        {
+            this.actualWeatherJSON = sharedPref.getString("weather", "");
+        }
+        if(sharedPref.contains("forecast"))
+        {
+            this.forecastJSON = sharedPref.getString("forecast", "");
+        }
+
+
+
         weatherList = new ArrayList<Weather>();
+        databaseHelper = new DatabaseHelper(this);
         setContentView(R.layout.activity_main);
         Toolbar toolbar = findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
@@ -107,42 +139,86 @@ public class MainActivity extends AppCompatActivity {
         );
 
         // Location manager
-        fusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
+//        fusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
+//
+//        fusedLocationClient.getLastLocation()
+//                .addOnSuccessListener(this, new OnSuccessListener<Location>() {
+//                    @Override
+//                    public void onSuccess(Location location) {
+//                        if (location != null) {
+//                            longitude = location.getLongitude();
+//                            latitude = location.getLatitude();
+//                            httpRequestForLocation();
+//                            pullHook.setRefreshing(false);
+//                            pullHook.setRefreshing(false);
+//                        }
+//                        else {
+//                            Toast.makeText(MainActivity.this, "Could not get location, loading last forecast", Toast.LENGTH_SHORT).show();
+//                            DecodeJson();
+//                            pullHook.setRefreshing(false);
+//                        }
+//                    }
+//                });
 
-        fusedLocationClient.getLastLocation()
-                .addOnSuccessListener(this, new OnSuccessListener<Location>() {
-                    @Override
-                    public void onSuccess(Location location) {
-                        if (location != null) {
-                            longitude = location.getLongitude();
-                            latitude = location.getLatitude();
-                            httpRequestForLocation();
-                        }
-                        else {
-                            Toast.makeText(MainActivity.this, "Could not get location", Toast.LENGTH_SHORT).show();
-                        }
-                    }
-                });
 
-        addFavouriteCity("Ostrava");
-        addFavouriteCity("Praha");
+        //fill saved favourite cities
+
+        final Cursor data = databaseHelper.getData();
+        while (data.moveToNext()) {
+            final String city = data.getString(1);
+            FavouriteCitiesMenu.add(city).setOnMenuItemClickListener(new MenuItem.OnMenuItemClickListener() {
+                @Override
+                public boolean onMenuItemClick(MenuItem item) {
+                    httpRequestForCity(city);
+                    return false;
+                }
+            });
+        }
+
+
         listView = (ListView)findViewById(R.id.weather_list);
     }
 
     @Override
     protected void onStart() {
         super.onStart();
+
+        //Pull refresh setting
+        pullHook = findViewById(R.id.swipeRefreshLayout);
+        pullHook.setOnRefreshListener(new PullRefreshLayout.OnRefreshListener() {
+            @Override
+            public void onRefresh() {
+                getLocation();
+                pullHook.setRefreshing(false);
+            }
+        });
+
         listView = (ListView)findViewById(R.id.weather_list);
 
-        //Get location on start which call httprequest for location
-        fusedLocationClient.getLastLocation();
+        getLocation();
     }
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         // Inflate the menu; this adds items to the action bar if it is present.
         getMenuInflater().inflate(R.menu.main, menu);
+        this.menu = menu;
         return true;
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(@NonNull MenuItem item) {
+        switch (item.getItemId())
+        {
+            case R.id.addCity:
+                addFavouriteCity(actualcity);
+                return true;
+            case R.id.removeCity:
+                removeFavouriteCity(actualcity);
+                return true;
+                default:
+                    return super.onOptionsItemSelected(item);
+        }
     }
 
     @Override
@@ -154,20 +230,39 @@ public class MainActivity extends AppCompatActivity {
 
     public void addFavouriteCity(final String cityName)
     {
-        FavouriteCitiesMenu.add(cityName).setOnMenuItemClickListener(new MenuItem.OnMenuItemClickListener() {
-            @Override
-            public boolean onMenuItemClick(MenuItem item) {
-                httpRequestForCity(cityName);
-                return false;
+        if(databaseHelper.addData(cityName)) {
+            FavouriteCitiesMenu.add(cityName).setOnMenuItemClickListener(new MenuItem.OnMenuItemClickListener() {
+                @Override
+                public boolean onMenuItemClick(MenuItem item) {
+                    httpRequestForCity(cityName);
+                    return false;
+                }
+            });
+            navigationView.invalidate();
+            setMenuItemVisibility(cityName);
+        }
+    }
+    public void removeFavouriteCity(String cityName)
+    {
+        if(databaseHelper.delete(cityName)) {
+            FavouriteCitiesMenu.clear();
+            final Cursor data = databaseHelper.getData();
+            while (data.moveToNext()) {
+                final String city = data.getString(1);
+                FavouriteCitiesMenu.add(city).setOnMenuItemClickListener(new MenuItem.OnMenuItemClickListener() {
+                    @Override
+                    public boolean onMenuItemClick(MenuItem item) {
+                        httpRequestForCity(city);
+                        return false;
+                    }
+                });
             }
-        });
-        navigationView.invalidate();
+        }
+        setMenuItemVisibility(cityName);
     }
 
     public void httpRequestForCity(String cityName)
     {
-        //final TextView txtView = findViewById(R.id.text_home);
-
         RequestQueue queue = Volley.newRequestQueue(this);
 
         //Actual weather request
@@ -181,7 +276,8 @@ public class MainActivity extends AppCompatActivity {
                 }, new Response.ErrorListener() {
             @Override
             public void onErrorResponse(VolleyError error) {
-                Toast.makeText(MainActivity.this, "City not found", Toast.LENGTH_SHORT).show();
+                DecodeJson();
+                Toast.makeText(MainActivity.this, "City not found or you are offline, loading last forecast", Toast.LENGTH_SHORT).show();
 
             }
         });
@@ -194,8 +290,7 @@ public class MainActivity extends AppCompatActivity {
                     public void onResponse(String response) {
                         forecastJSON = response;
                         DecodeJson();
-                        //txtView.setText(actualWeatherJSON + '\n' + forecastJSON);
-                        //TODO process JSON and show forecast on screen
+                        saveWeather();
                     }
                 }, new Response.ErrorListener() {
             @Override
@@ -237,8 +332,7 @@ public class MainActivity extends AppCompatActivity {
                     public void onResponse(String response) {
                         forecastJSON = response;
                         DecodeJson();
-                        //txtView.setText(actualWeatherJSON + '\n' + forecastJSON);
-                        //TODO process JSON and show forecast on screen
+                        saveWeather();
                     }
                 }, new Response.ErrorListener() {
             @Override
@@ -251,9 +345,22 @@ public class MainActivity extends AppCompatActivity {
         queue.add(stringRequestForecast);
     }
 
+    public void setMenuItemVisibility(String city)
+    {
+        if(databaseHelper.exists(city))
+        {
+            menu.findItem(R.id.addCity).setVisible(false);
+            menu.findItem(R.id.removeCity).setVisible(true);
+        }
+        else
+        {
+            menu.findItem(R.id.addCity).setVisible(true);
+            menu.findItem(R.id.removeCity).setVisible(false);
+        }
+    }
+
     public void DecodeJson()
     {
-        //final TextView txtView = findViewById(R.id.text_home);
         try {
             listView = (ListView)findViewById(R.id.weather_list);
             weatherList = new ArrayList<Weather>();
@@ -268,6 +375,7 @@ public class MainActivity extends AppCompatActivity {
             double temp = weatherMain.getDouble("temp");
             int pressure = weatherMain.getInt("pressure");
             int humidity = weatherMain.getInt("humidity");
+            actualcity = cityname;
 
             Date c = Calendar.getInstance().getTime();
             SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd");
@@ -302,15 +410,36 @@ public class MainActivity extends AppCompatActivity {
             listView.setAdapter(Adapter);
 
             search_bar.setText(cityname);
-            //txtView.setText(cityname);
+            setMenuItemVisibility(cityname);
 
-            //TODO save weatherList into file
+            pullHook.setRefreshing(false);
 
 
-            //txtView.setText(cityname + '\n' + main + '\n' + description + '\n' + icon + '\n' + temp + '\n' + pressure + '\n' + humidity + '\n' + date);
 
         } catch (JSONException e) {
             e.printStackTrace();
         }
     }
+
+    public void saveWeather()
+    {
+        SharedPreferences sharedPref = getApplicationContext().getSharedPreferences("JSONs", Context.MODE_PRIVATE);
+        SharedPreferences.Editor editor = sharedPref.edit();
+        editor.putString("weather", actualWeatherJSON);
+        editor.putString("forecast", forecastJSON);
+        editor.commit();
+    }
+
+    public void getLocation()
+    {
+        GPSTracker gps = new GPSTracker(MainActivity.this);
+        if(gps.canGetLocation()){
+            latitude = gps.getLatitude();
+            longitude = gps.getLongitude();
+            httpRequestForLocation();
+        }else{
+            Toast.makeText(MainActivity.this, "Could not get location, loading last forecast", Toast.LENGTH_SHORT).show();
+        }
+    }
+
 }
