@@ -10,10 +10,13 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent">
 
-        <ListView
+        <ExpandableListView
             android:id="@+id/weather_list"
             android:layout_width="413dp"
             android:layout_height="734dp"
+            android:groupIndicator="@null"
+            android:divider="@android:color/darker_gray"
+            android:dividerHeight="0.5dp"
             tools:layout_editor_absoluteX="-2dp"
             tools:layout_editor_absoluteY="-2dp" />
 

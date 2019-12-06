@@ -36,4 +36,21 @@ public class Weather implements Serializable {
     public String getIcon() {
         return icon;
     }
+    public String getDescription()
+    {
+        return this.description;
+    }
+    public String getDetail()
+    {
+        return this.detail;
+    }
+    public int getPressure()
+    {
+        return this.pressure;
+    }
+    public int getHumidity()
+    {
+        return  this.humidity;
+    }
+
 }

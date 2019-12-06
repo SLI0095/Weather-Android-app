@@ -50,6 +50,7 @@ import android.view.Menu;
 import android.view.View;
 import android.view.inputmethod.EditorInfo;
 import android.widget.EditText;
+import android.widget.ExpandableListView;
 import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -62,6 +63,7 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
 
 
@@ -72,9 +74,10 @@ public class MainActivity extends AppCompatActivity {
     private SubMenu FavouriteCitiesMenu;
     private FusedLocationProviderClient fusedLocationClient;
     private EditText search_bar;
-    private ArrayList<Weather> weatherList;
-    private ListView listView;
-    private WeatherAdapter Adapter;
+    private List<Weather> weatherList;
+    private HashMap<Weather, List<Weather>> expandableListData;
+    private ExpandableListView listView;
+    private WeatherExpandableListAdapter Adapter;
     private Menu menu;
     private String actualcity;
     public String actualWeatherJSON = "", forecastJSON = "";
@@ -98,7 +101,7 @@ public class MainActivity extends AppCompatActivity {
         }
 
 
-
+        expandableListData = new HashMap<Weather, List<Weather>>();
         weatherList = new ArrayList<Weather>();
         databaseHelper = new DatabaseHelper(this);
         setContentView(R.layout.activity_main);
@@ -176,7 +179,7 @@ public class MainActivity extends AppCompatActivity {
         }
 
 
-        listView = (ListView)findViewById(R.id.weather_list);
+        listView = (ExpandableListView) findViewById(R.id.weather_list);
     }
 
     @Override
@@ -193,7 +196,7 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        listView = (ListView)findViewById(R.id.weather_list);
+        listView = (ExpandableListView) findViewById(R.id.weather_list);
 
         getLocation();
     }
@@ -276,8 +279,8 @@ public class MainActivity extends AppCompatActivity {
                 }, new Response.ErrorListener() {
             @Override
             public void onErrorResponse(VolleyError error) {
-                DecodeJson();
                 Toast.makeText(MainActivity.this, "City not found or you are offline, loading last forecast", Toast.LENGTH_SHORT).show();
+                DecodeJson();
 
             }
         });
@@ -362,8 +365,9 @@ public class MainActivity extends AppCompatActivity {
     public void DecodeJson()
     {
         try {
-            listView = (ListView)findViewById(R.id.weather_list);
-            weatherList = new ArrayList<Weather>();
+            expandableListData = new HashMap<Weather, List<Weather>>();
+            ArrayList<Weather> keyset = new ArrayList<>();
+            listView = (ExpandableListView) findViewById(R.id.weather_list);
             JSONObject root = new JSONObject(actualWeatherJSON);
             String cityname = root.getString("name");
             JSONArray weather = root.getJSONArray("weather");
@@ -381,7 +385,11 @@ public class MainActivity extends AppCompatActivity {
             SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd");
             String date = df.format(c);
 
-            weatherList.add(new Weather(cityname,main,description,icon,temp,pressure,humidity,date));
+            Weather detail = new Weather(cityname,main,description,icon,temp,pressure,humidity,date);
+            weatherList = new ArrayList<Weather>();
+            weatherList.add(detail);
+            keyset.add(detail);
+            expandableListData.put(detail,weatherList);
 
             root = new JSONObject(forecastJSON);
             JSONArray forecasts = root.getJSONArray("list");
@@ -402,11 +410,18 @@ public class MainActivity extends AppCompatActivity {
                     description = weatherDesc.getString("description");
                     icon = weatherDesc.getString("icon");
 
-                    weatherList.add(new Weather(cityname,main,description,icon,temp,pressure,humidity,date));
+                    detail = new Weather(cityname,main,description,icon,temp,pressure,humidity,date);
+                    weatherList = new ArrayList<Weather>();
+                    weatherList.add(detail);
+                    keyset.add(detail);
+                    expandableListData.put(detail,weatherList);
                 }
             }
-            weatherList.remove(weatherList.size()-1);
-            Adapter = new WeatherAdapter(this,weatherList);
+
+            Adapter = new WeatherExpandableListAdapter(this, keyset,expandableListData);
+
+
+
             listView.setAdapter(Adapter);
 
             search_bar.setText(cityname);
