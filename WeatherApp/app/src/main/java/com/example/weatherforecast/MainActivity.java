@@ -141,31 +141,7 @@ public class MainActivity extends AppCompatActivity {
                 }
         );
 
-        // Location manager
-//        fusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
-//
-//        fusedLocationClient.getLastLocation()
-//                .addOnSuccessListener(this, new OnSuccessListener<Location>() {
-//                    @Override
-//                    public void onSuccess(Location location) {
-//                        if (location != null) {
-//                            longitude = location.getLongitude();
-//                            latitude = location.getLatitude();
-//                            httpRequestForLocation();
-//                            pullHook.setRefreshing(false);
-//                            pullHook.setRefreshing(false);
-//                        }
-//                        else {
-//                            Toast.makeText(MainActivity.this, "Could not get location, loading last forecast", Toast.LENGTH_SHORT).show();
-//                            DecodeJson();
-//                            pullHook.setRefreshing(false);
-//                        }
-//                    }
-//                });
-
-
         //fill saved favourite cities
-
         final Cursor data = databaseHelper.getData();
         while (data.moveToNext()) {
             final String city = data.getString(1);
@@ -179,7 +155,7 @@ public class MainActivity extends AppCompatActivity {
         }
 
 
-        listView = (ExpandableListView) findViewById(R.id.weather_list);
+        //listView = (ExpandableListView) findViewById(R.id.weather_list);
     }
 
     @Override
@@ -199,6 +175,7 @@ public class MainActivity extends AppCompatActivity {
         listView = (ExpandableListView) findViewById(R.id.weather_list);
 
         getLocation();
+        search_bar.clearFocus();
     }
 
     @Override
@@ -206,6 +183,7 @@ public class MainActivity extends AppCompatActivity {
         // Inflate the menu; this adds items to the action bar if it is present.
         getMenuInflater().inflate(R.menu.main, menu);
         this.menu = menu;
+        setMenuItemVisibility(actualcity);
         return true;
     }
 
@@ -350,15 +328,17 @@ public class MainActivity extends AppCompatActivity {
 
     public void setMenuItemVisibility(String city)
     {
-        if(databaseHelper.exists(city))
+        try {
+            if (databaseHelper.exists(city)) {
+                menu.findItem(R.id.addCity).setVisible(false);
+                menu.findItem(R.id.removeCity).setVisible(true);
+            } else {
+                menu.findItem(R.id.addCity).setVisible(true);
+                menu.findItem(R.id.removeCity).setVisible(false);
+            }
+        }catch (Exception e)
         {
-            menu.findItem(R.id.addCity).setVisible(false);
-            menu.findItem(R.id.removeCity).setVisible(true);
-        }
-        else
-        {
-            menu.findItem(R.id.addCity).setVisible(true);
-            menu.findItem(R.id.removeCity).setVisible(false);
+
         }
     }
 
@@ -426,6 +406,7 @@ public class MainActivity extends AppCompatActivity {
 
             search_bar.setText(cityname);
             setMenuItemVisibility(cityname);
+            search_bar.setText(cityname);
 
             pullHook.setRefreshing(false);
 
@@ -454,6 +435,7 @@ public class MainActivity extends AppCompatActivity {
             httpRequestForLocation();
         }else{
             Toast.makeText(MainActivity.this, "Could not get location, loading last forecast", Toast.LENGTH_SHORT).show();
+            DecodeJson();
         }
     }
 
